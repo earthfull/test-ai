@@ -20,10 +20,22 @@ jobs:
 
       - name: Get PR diff
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          gh pr diff ${{ github.event.pull_request.number }} > /tmp/pr.diff
-          head -c 30000 /tmp/pr.diff > /tmp/pr_truncated.diff
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          # สร้าง diff โดยตัดไฟล์ขยะที่ทำให้โมเดลสับสน/กิน budget ออก
+          # (lock files, ของ generate, dependency, ไฟล์ config เครื่องมือ)
+          git diff "origin/$BASE_REF...HEAD" -- . \
+            ':(exclude)**/*.lock' \
+            ':(exclude)yarn.lock' \
+            ':(exclude)package-lock.json' \
+            ':(exclude)pnpm-lock.yaml' \
+            ':(exclude).claude/**' \
+            ':(exclude)dist/**' \
+            ':(exclude)node_modules/**' \
+            ':(exclude)**/*.snap' \
+            > /tmp/pr.diff
+          head -c 60000 /tmp/pr.diff > /tmp/pr_truncated.diff
 
       - name: Generate description
         id: ai
@@ -31,17 +43,30 @@ jobs:
         with:
           model: openai/gpt-4o
           system-prompt: |
-            You are a senior backend engineer. Summarize this NestJS PR diff into a
-            clear PR description in Thai. Use these sections:
-            ## สรุป (1-2 บรรทัดว่า PR นี้ทำอะไร)
-            ## การเปลี่ยนแปลงหลัก (bullet)
+            You are a senior backend engineer writing a pull-request description in
+            THAI for a NestJS project. You will be given a git diff.
+
+            Output Markdown with EXACTLY these three sections:
+            ## สรุป
+            1-2 ประโยคสมบูรณ์ว่า PR นี้ทำอะไร
+            ## การเปลี่ยนแปลงหลัก
+            - bullet ละ 1 ประโยคสมบูรณ์ ระบุว่าเพิ่ม/แก้ไฟล์หรือฟีเจอร์อะไร
             ## จุดที่ควร review เป็นพิเศษ
-            ตอบเฉพาะตัว description เป็น markdown ห้ามมีคำนำอื่น
+            - bullet สั้น ๆ
+
+            กฎเหล็ก:
+            - เขียนภาษาไทยที่เป็นประโยคสมบูรณ์ ห้ามทิ้งประโยคค้างหรือเว้นช่องว่างแทนคำ
+            - อธิบายจาก "เจตนาของการเปลี่ยนแปลง" ไม่ใช่อ่าน diff ทีละบรรทัด
+            - ห้ามคัดลอกข้อความ error, log, คำเตือน compiler, หรือ stack trace ใด ๆ ลงใน description
+            - มองข้ามไฟล์ตั้งค่าเครื่องมือ/lock file ที่หลงเหลือ ให้โฟกัสที่ซอร์สโค้ดจริง
+            - ตอบเฉพาะตัว description เป็น markdown เท่านั้น ห้ามมีคำนำหรือคำต่อท้าย
           prompt-file: /tmp/pr_truncated.diff
 
       - name: Update PR body
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_BODY: ${{ steps.ai.outputs.response }}
         run: |
-          gh pr edit ${{ github.event.pull_request.number }} \
-            --body "${{ steps.ai.outputs.response }}"
+          # เขียนผ่านไฟล์แทนการ interpolate ลง command ตรง ๆ (กัน shell injection)
+          printf '%s' "$AI_BODY" > /tmp/pr_body.md
+          gh pr edit ${{ github.event.pull_request.number }} --body-file /tmp/pr_body.md
