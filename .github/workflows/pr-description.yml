@@ -60,6 +60,8 @@ jobs:
             - ห้ามคัดลอกข้อความ error, log, คำเตือน compiler, หรือ stack trace ใด ๆ ลงใน description
             - มองข้ามไฟล์ตั้งค่าเครื่องมือ/lock file ที่หลงเหลือ ให้โฟกัสที่ซอร์สโค้ดจริง
             - ตอบเฉพาะตัว description เป็น markdown เท่านั้น ห้ามมีคำนำหรือคำต่อท้าย
+            - ห้ามครอบคำตอบทั้งก้อนด้วย code fence (``` หรือ ```markdown) เด็ดขาด
+              ให้ขึ้นต้นด้วย "## สรุป" ตรง ๆ เพื่อให้ GitHub render เป็นหัวข้อจริง
           prompt-file: /tmp/pr_truncated.diff
 
       - name: Update PR body
@@ -68,5 +70,8 @@ jobs:
           AI_BODY: ${{ steps.ai.outputs.response }}
         run: |
           # เขียนผ่านไฟล์แทนการ interpolate ลง command ตรง ๆ (กัน shell injection)
-          printf '%s' "$AI_BODY" > /tmp/pr_body.md
+          printf '%s' "$AI_BODY" > /tmp/pr_body_raw.md
+          # safety net: ตัด code fence ที่โมเดลอาจครอบมา (บรรทัดแรก/สุดท้ายที่เป็น ```)
+          sed -e '1{/^[[:space:]]*```/d}' -e '${/^[[:space:]]*```[[:space:]]*$/d}' \
+            /tmp/pr_body_raw.md > /tmp/pr_body.md
           gh pr edit ${{ github.event.pull_request.number }} --body-file /tmp/pr_body.md
