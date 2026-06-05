@@ -56,4 +56,14 @@ export class CreateProductDto {
   @ApiProperty({ example: 'b3f1c2d4-0000-0000-0000-000000000000' })
   @IsUUID()
   categoryId: string;
+
+  @ApiProperty({
+    example: 'c4a2d3e5-0000-0000-0000-000000000000',
+    required: false,
+    nullable: true,
+    description: 'ร้านค้าที่สินค้านี้สังกัด (ใส่ทีหลังได้)',
+  })
+  @IsOptional()
+  @IsUUID()
+  storeId?: string;
 }

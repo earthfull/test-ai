@@ -9,6 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Category } from './category.entity';
+import { Store } from './store.entity';
 
 export enum ProductStatus {
   ACTIVE = 'active',
@@ -55,6 +56,16 @@ export class Product {
   })
   @JoinColumn({ name: 'categoryId' })
   category: Category;
+
+  @Column({ type: 'uuid', nullable: true })
+  storeId: string | null;
+
+  @ManyToOne(() => Store, (store) => store.products, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'storeId' })
+  store: Store | null;
 
   @CreateDateColumn()
   createdAt: Date;

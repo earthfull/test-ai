@@ -6,6 +6,7 @@ import {
 import { randomUUID } from 'crypto';
 import { Product, ProductStatus } from '../../db/schemas';
 import { CategoriesService } from '../categories/categories.service';
+import { StoresService } from '../stores/stores.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 
@@ -17,11 +18,18 @@ import { UpdateProductDto } from './dto/update-product.dto';
 export class ProductsService {
   private readonly products: Product[] = [];
 
-  constructor(private readonly categoriesService: CategoriesService) {}
+  constructor(
+    private readonly categoriesService: CategoriesService,
+    private readonly storesService: StoresService,
+  ) {}
 
   create(dto: CreateProductDto): Product {
     // ตรวจว่าหมวดหมู่มีอยู่จริง (โยน NotFoundException ถ้าไม่พบ)
     this.categoriesService.findOne(dto.categoryId);
+    // ตรวจร้านค้า เฉพาะเมื่อส่ง storeId มา (optional)
+    if (dto.storeId) {
+      this.storesService.findOne(dto.storeId);
+    }
 
     if (this.products.some((p) => p.sku === dto.sku)) {
       throw new ConflictException(`SKU "${dto.sku}" already exists`);
@@ -38,6 +46,8 @@ export class ProductsService {
       status: dto.status ?? ProductStatus.ACTIVE,
       categoryId: dto.categoryId,
       category: undefined as never,
+      storeId: dto.storeId ?? null,
+      store: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -64,6 +74,9 @@ export class ProductsService {
     if (dto.categoryId) {
       this.categoriesService.findOne(dto.categoryId);
     }
+    if (dto.storeId) {
+      this.storesService.findOne(dto.storeId);
+    }
 
     if (
       dto.sku &&
@@ -82,6 +95,7 @@ export class ProductsService {
       stock: dto.stock ?? product.stock,
       status: dto.status ?? product.status,
       categoryId: dto.categoryId ?? product.categoryId,
+      storeId: dto.storeId ?? product.storeId,
       updatedAt: new Date(),
     });
     return product;
