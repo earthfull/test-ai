@@ -42,6 +42,7 @@ jobs:
         uses: actions/ai-inference@v1
         with:
           model: openai/gpt-4o
+          max-tokens: 1500 # กันคำตอบโดนตัดกลางประโยค (default ต่ำเกินไป)
           system-prompt: |
             You are a senior backend engineer writing a pull-request description in
             THAI for a NestJS project. You will be given a git diff.
