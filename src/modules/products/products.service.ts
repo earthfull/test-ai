@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -34,6 +35,11 @@ export class ProductsService {
     if (this.products.some((p) => p.sku === dto.sku)) {
       throw new ConflictException(`SKU "${dto.sku}" already exists`);
     }
+
+    this.assertStatusStockConsistent(
+      dto.status ?? ProductStatus.ACTIVE,
+      dto.stock ?? 0,
+    );
 
     const product: Product = {
       id: randomUUID(),
@@ -86,6 +92,12 @@ export class ProductsService {
       throw new ConflictException(`SKU "${dto.sku}" already exists`);
     }
 
+    // เช็คความสอดคล้องกับค่าหลังอัปเดต (รวมค่าเดิมที่ไม่ได้ส่งมา)
+    this.assertStatusStockConsistent(
+      dto.status ?? product.status,
+      dto.stock ?? product.stock,
+    );
+
     Object.assign(product, {
       sku: dto.sku ?? product.sku,
       name: dto.name ?? product.name,
@@ -99,6 +111,21 @@ export class ProductsService {
       updatedAt: new Date(),
     });
     return product;
+  }
+
+  /**
+   * Business rule: ถ้า status เป็น OUT_OF_STOCK แต่ stock ยังมากกว่า 0
+   * ถือว่าข้อมูลไม่สอดคล้องกัน → 400
+   */
+  private assertStatusStockConsistent(
+    status: ProductStatus,
+    stock: number,
+  ): void {
+    if (status === ProductStatus.OUT_OF_STOCK && stock > 0) {
+      throw new BadRequestException(
+        'status เป็น out_of_stock ได้เฉพาะเมื่อ stock = 0',
+      );
+    }
   }
 
   remove(id: string): void {
