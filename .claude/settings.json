@@ -4,7 +4,9 @@
       "PowerShell(yarn add @nestjs/swagger class-validator class-transformer 2>&1)",
       "PowerShell(yarn build 2>&1)",
       "PowerShell(if \\($?\\) { \"BUILD OK\" })",
-      "PowerShell(yarn test:e2e 2>&1)"
+      "PowerShell(yarn test:e2e 2>&1)",
+      "PowerShell(npx tsc --noEmit -p tsconfig.json 2>&1)",
+      "PowerShell(if \\($?\\) { \"TYPECHECK OK\" })"
     ]
   }
 }
