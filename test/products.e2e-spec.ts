@@ -135,6 +135,71 @@ describe('ProductsController (e2e)', () => {
         stock: 1.5,
       }).expect(400);
     });
+
+    it('sku ว่าง → 400', async () => {
+      await createProduct({ ...baseProduct(), sku: '' }).expect(400);
+    });
+
+    it('sku มีอักขระไม่ถูกต้อง (เว้นวรรค/อักขระพิเศษ) → 400', async () => {
+      await createProduct({ ...baseProduct(), sku: 'TS RED@M' }).expect(400);
+    });
+
+    it('sku ตัวพิมพ์เล็ก ถูก normalize เป็นพิมพ์ใหญ่ + ตัด whitespace', async () => {
+      const res = await createProduct({
+        ...baseProduct(),
+        sku: '  ts-red-m  ',
+      }).expect(201);
+      expect(res.body.sku).toBe('TS-RED-M');
+    });
+
+    it('name เป็นช่องว่างล้วน → 400', async () => {
+      await createProduct({ ...baseProduct(), sku: 'BLANK', name: '   ' }).expect(
+        400,
+      );
+    });
+
+    it('description ยาวเกิน 1000 ตัวอักษร → 400', async () => {
+      await createProduct({
+        ...baseProduct(),
+        sku: 'LONG-DESC',
+        description: 'x'.repeat(1001),
+      }).expect(400);
+    });
+
+    it('price เกินเพดาน (> 1,000,000) → 400', async () => {
+      await createProduct({
+        ...baseProduct(),
+        sku: 'TOO-EXPENSIVE',
+        price: 1_000_001,
+      }).expect(400);
+    });
+
+    it('stock เกินเพดาน (> 1,000,000) → 400', async () => {
+      await createProduct({
+        ...baseProduct(),
+        sku: 'TOO-MUCH-STOCK',
+        stock: 1_000_001,
+      }).expect(400);
+    });
+
+    it('status=out_of_stock แต่ stock > 0 → 400 (ไม่สอดคล้อง)', async () => {
+      await createProduct({
+        ...baseProduct(),
+        sku: 'INCONSISTENT',
+        status: 'out_of_stock',
+        stock: 5,
+      }).expect(400);
+    });
+
+    it('status=out_of_stock + stock=0 → 201 (ผ่าน)', async () => {
+      const res = await createProduct({
+        ...baseProduct(),
+        sku: 'EMPTY-STOCK',
+        status: 'out_of_stock',
+        stock: 0,
+      }).expect(201);
+      expect(res.body.status).toBe('out_of_stock');
+    });
   });
 
   describe('GET /products', () => {
@@ -197,6 +262,25 @@ describe('ProductsController (e2e)', () => {
         .patch(`/products/${other.body.id}`)
         .send({ sku: 'TS-RED-M' })
         .expect(409);
+    });
+
+    it('แก้ status=out_of_stock ขณะ stock เดิม > 0 → 400 (ไม่สอดคล้อง)', async () => {
+      // baseProduct มี stock = 45
+      const created = await createProduct(baseProduct());
+      await request(app.getHttpServer())
+        .patch(`/products/${created.body.id}`)
+        .send({ status: 'out_of_stock' })
+        .expect(400);
+    });
+
+    it('แก้ status=out_of_stock พร้อม stock=0 ในคำขอเดียว → 200', async () => {
+      const created = await createProduct(baseProduct());
+      const res = await request(app.getHttpServer())
+        .patch(`/products/${created.body.id}`)
+        .send({ status: 'out_of_stock', stock: 0 })
+        .expect(200);
+      expect(res.body.status).toBe('out_of_stock');
+      expect(res.body.stock).toBe(0);
     });
 
     it('แก้ไปยัง categoryId ที่ไม่มีอยู่ → 404', async () => {
