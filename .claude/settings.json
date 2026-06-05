@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(yarn add @nestjs/swagger class-validator class-transformer 2>&1)",
+      "PowerShell(yarn build 2>&1)",
+      "PowerShell(if \\($?\\) { \"BUILD OK\" })",
+      "PowerShell(yarn test:e2e 2>&1)"
+    ]
+  }
+}

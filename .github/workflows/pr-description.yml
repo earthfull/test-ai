@@ -1,0 +1,47 @@
+name: AI PR Description
+
+on:
+  pull_request:
+    types: [opened] # เพิ่ม reopened, synchronize ได้ถ้าอยากให้อัปเดตทุก push
+
+permissions:
+  contents: read
+  pull-requests: write # แก้ PR body
+  models: read # ปลดล็อก GitHub Models ให้ GITHUB_TOKEN
+
+jobs:
+  describe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr diff ${{ github.event.pull_request.number }} > /tmp/pr.diff
+          head -c 30000 /tmp/pr.diff > /tmp/pr_truncated.diff
+
+      - name: Generate description
+        id: ai
+        uses: actions/ai-inference@v1
+        with:
+          model: openai/gpt-4o
+          system-prompt: |
+            You are a senior backend engineer. Summarize this NestJS PR diff into a
+            clear PR description in Thai. Use these sections:
+            ## สรุป (1-2 บรรทัดว่า PR นี้ทำอะไร)
+            ## การเปลี่ยนแปลงหลัก (bullet)
+            ## จุดที่ควร review เป็นพิเศษ
+            ตอบเฉพาะตัว description เป็น markdown ห้ามมีคำนำอื่น
+          prompt-file: /tmp/pr_truncated.diff
+
+      - name: Update PR body
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} \
+            --body "${{ steps.ai.outputs.response }}"
